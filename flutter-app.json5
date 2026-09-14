@@ -1,0 +1,63 @@
+{
+  $schema: 'https://docs.renovatebot.com/renovate-schema.json',
+  extends: ['config:recommended'],
+
+  // Health Flare's Flutter apps are low-maintenance side projects — batch
+  // updates into one weekly run instead of a steady drip of individual PRs.
+  schedule: ['before 6am on monday'],
+  timezone: 'UTC',
+
+  dependencyDashboard: true,
+  labels: ['dependencies'],
+
+  packageRules: [
+    // No major version bump, from any manager, ever auto-merges without a
+    // human reading the changelog first. Every app-specific automerge rule
+    // built on top of this base must scope itself to matchUpdateTypes:
+    // ['patch', 'minor'] (never leave it unscoped) so it doesn't fight this
+    // rule on ordering.
+    {
+      matchUpdateTypes: ['major'],
+      automerge: false,
+      labels: ['dependencies', 'major-update'],
+    },
+
+    // android/settings.gradle.kts declares the standard `flutter create`
+    // boilerplate plugin `dev.flutter.flutter-plugin-loader` version
+    // "1.0.0". It isn't fetched from Maven/Gradle Plugin Portal at all —
+    // pluginManagement's includeBuild("$flutterSdkPath/packages/flutter_tools/gradle")
+    // supplies it locally from the bundled Flutter SDK, and its version
+    // tracks the Flutter SDK rather than an independent release train.
+    // Renovate doesn't know that; since the plugin isn't in its registry of
+    // known Gradle plugins, it guesses the standard marker artifact
+    // coordinate (`<pluginId>:<pluginId>.gradle.plugin`) and repeatedly
+    // fails resolving *that* against the configured repositories (see the
+    // "Package lookup failures" / "Dependency Lookup Warnings" repository
+    // problems on the dashboard) — match on the marker coordinate, not the
+    // bare plugin id, to actually disable the lookup.
+    {
+      matchManagers: ['gradle'],
+      matchPackageNames: [
+        'dev.flutter.flutter-plugin-loader',
+        'dev.flutter.flutter-plugin-loader:dev.flutter.flutter-plugin-loader.gradle.plugin',
+      ],
+      enabled: false,
+    },
+  ],
+
+  // Keeps the lockfile's transitive deps current within existing version
+  // constraints even between direct version bumps in pubspec.yaml — routine
+  // lockfile hygiene, unaffected by whatever automerge/major policy an
+  // individual repo layers on top of this base.
+  lockFileMaintenance: {
+    enabled: true,
+    schedule: ['before 6am on monday'],
+  },
+
+  // Security patches bypass whatever release-age/major-only policy a repo
+  // layers on top of this base — waiting on a known vulnerability defeats
+  // the point.
+  vulnerabilityAlerts: {
+    labels: ['dependencies', 'security'],
+  },
+}
